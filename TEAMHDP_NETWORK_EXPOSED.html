@@ -1,0 +1,884 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TeamHDP Network Exposed — Full Investigation Suite</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Segoe UI',system-ui,sans-serif;background:#0a0a0f;color:#e0e0e0;line-height:1.6}
+.container{max-width:1500px;margin:0 auto;padding:20px 24px}
+
+/* === HEADER === */
+.hero{text-align:center;padding:40px 20px 30px;background:linear-gradient(135deg,#0d1117 0%,#1a1025 50%,#0d1117 100%);border-bottom:4px solid;border-image:linear-gradient(90deg,#FFD100 33%,#003893 33%,#003893 66%,#CF142B 66%) 1;position:relative;overflow:hidden}
+.hero::before{content:'';position:absolute;top:0;left:0;right:0;bottom:0;background:radial-gradient(circle at 50% 0%,rgba(207,20,43,0.08) 0%,transparent 70%);pointer-events:none}
+.hero h1{font-size:2.8em;letter-spacing:4px;text-transform:uppercase;background:linear-gradient(90deg,#FFD100,#fff,#CF142B);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;margin-bottom:8px;font-weight:900}
+.hero .subtitle{color:#888;font-size:1.05em;margin-bottom:6px}
+.hero .byline{color:#CF142B;font-size:0.85em;font-weight:bold;letter-spacing:2px;text-transform:uppercase}
+.hero .threat-banner{background:linear-gradient(90deg,#CF142B,#8b0000);color:#fff;padding:12px 20px;border-radius:8px;margin-top:20px;font-weight:bold;font-size:1.05em;display:inline-block;animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{box-shadow:0 0 10px rgba(207,20,43,0.4)}50%{box-shadow:0 0 25px rgba(207,20,43,0.8)}}
+
+/* === STATS BAR === */
+.stats{display:grid;grid-template-columns:repeat(6,1fr);gap:12px;margin:25px 0}
+.stat{background:linear-gradient(135deg,#12121a,#1a1a28);border:1px solid #2a2a3a;border-radius:10px;padding:16px 10px;text-align:center;transition:all 0.3s}
+.stat:hover{border-color:#FFD100;transform:translateY(-2px);box-shadow:0 4px 15px rgba(255,209,0,0.15)}
+.stat .n{font-size:2em;font-weight:900}
+.stat .l{font-size:0.7em;color:#777;text-transform:uppercase;letter-spacing:1px;margin-top:4px}
+.n-red{color:#CF142B}.n-org{color:#ff8c00}.n-yel{color:#FFD100}.n-blu{color:#4a9eff}.n-grn{color:#00cc66}.n-pur{color:#a855f7}
+
+/* === NAV === */
+.nav{display:flex;flex-wrap:wrap;gap:8px;margin:20px 0 30px;justify-content:center}
+.nav a{background:#1a1a28;color:#aaa;padding:8px 16px;border-radius:6px;text-decoration:none;font-size:0.8em;border:1px solid #2a2a3a;transition:all 0.2s;text-transform:uppercase;letter-spacing:1px;font-weight:600}
+.nav a:hover{background:#CF142B;color:#fff;border-color:#CF142B}
+
+/* === SECTIONS === */
+h2{color:#FFD100;font-size:1.6em;margin:40px 0 15px;padding-bottom:8px;border-bottom:2px solid #2a2a3a;text-transform:uppercase;letter-spacing:2px}
+h2 .tag{font-size:0.5em;padding:4px 10px;border-radius:4px;vertical-align:middle;margin-left:10px;letter-spacing:0}
+h3{color:#4a9eff;font-size:1.1em;margin:20px 0 10px}
+
+/* === PROFILE CARDS === */
+.profiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(420px,1fr));gap:16px;margin:15px 0}
+.profile{background:linear-gradient(135deg,#12121a,#181825);border:1px solid #2a2a3a;border-radius:12px;padding:18px 20px;transition:all 0.3s;position:relative;overflow:hidden}
+.profile:hover{border-color:#FFD100;box-shadow:0 4px 20px rgba(255,209,0,0.1)}
+.profile::before{content:'';position:absolute;top:0;left:0;width:4px;height:100%;border-radius:4px 0 0 4px}
+.profile.critical::before{background:#CF142B}
+.profile.high::before{background:#ff8c00}
+.profile.medium::before{background:#FFD100}
+.profile.unknown::before{background:#a855f7}
+.profile.dead::before{background:#555}
+.profile .p-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px}
+.profile .p-name{font-size:1.15em;font-weight:bold;color:#fff}
+.profile .p-alias{color:#FFD100;font-size:0.85em;font-style:italic}
+.profile .p-role{color:#aaa;font-size:0.82em;margin:4px 0 8px}
+.p-badge{padding:3px 10px;border-radius:4px;font-size:0.7em;font-weight:bold;text-transform:uppercase;letter-spacing:1px}
+.b-critical{background:#CF142B;color:#fff}
+.b-high{background:#ff8c00;color:#fff}
+.b-medium{background:#FFD100;color:#000}
+.b-low{background:#555;color:#fff}
+.b-dead{background:#333;color:#888}
+.b-unknown{background:#a855f7;color:#fff}
+.p-details{font-size:0.82em;color:#bbb;line-height:1.7}
+.p-details strong{color:#FFD100}
+.p-details .loc{color:#00cc66}
+.p-details .warn{color:#CF142B;font-weight:bold}
+
+/* === NETWORK MAP === */
+.network-map{background:linear-gradient(135deg,#0d0d15,#12121f);border:2px solid #2a2a3a;border-radius:12px;padding:30px;margin:20px 0;position:relative;overflow:hidden}
+.network-map::before{content:'';position:absolute;top:0;left:0;right:0;bottom:0;background:radial-gradient(circle at 50% 30%,rgba(74,158,255,0.03) 0%,transparent 60%);pointer-events:none}
+.node{display:inline-block;padding:8px 14px;border-radius:8px;font-size:0.78em;font-weight:bold;margin:4px;text-align:center;min-width:140px;position:relative}
+.node-boss{background:linear-gradient(135deg,#CF142B,#8b0000);color:#fff;font-size:0.95em;padding:12px 20px;border:2px solid #ff4444}
+.node-core{background:#1a2744;color:#4a9eff;border:1px solid #2a4a7a}
+.node-extort{background:#2a1a0a;color:#ff8c00;border:1px solid #5a3a1a}
+.node-prop{background:#1a1a2a;color:#a855f7;border:1px solid #3a2a5a}
+.node-breach{background:#0a1a0a;color:#00cc66;border:1px solid #1a3a1a}
+.node-maklad{background:#2a0a0a;color:#ff4444;border:1px solid #4a1a1a}
+.node-dead{background:#1a1a1a;color:#666;border:1px solid #333;text-decoration:line-through}
+.node-unknown{background:#1a0a2a;color:#a855f7;border:1px solid #3a1a4a}
+.connector{color:#333;font-size:1.2em;display:block;text-align:center;line-height:1.2}
+.net-row{text-align:center;margin:8px 0}
+.net-label{color:#555;font-size:0.7em;text-transform:uppercase;letter-spacing:2px;margin:15px 0 5px;display:block}
+
+/* === TIMELINE === */
+.timeline{position:relative;margin:20px 0;padding-left:30px}
+.timeline::before{content:'';position:absolute;left:12px;top:0;bottom:0;width:2px;background:linear-gradient(180deg,#CF142B,#FFD100,#003893,#00cc66)}
+.t-item{position:relative;margin-bottom:20px;padding-left:25px}
+.t-item::before{content:'';position:absolute;left:-22px;top:6px;width:12px;height:12px;border-radius:50%;border:2px solid #FFD100;background:#0a0a0f}
+.t-item.t-critical::before{background:#CF142B;border-color:#CF142B;box-shadow:0 0 8px rgba(207,20,43,0.5)}
+.t-date{color:#FFD100;font-weight:bold;font-size:0.85em}
+.t-text{color:#ccc;font-size:0.85em;margin-top:2px}
+.t-text strong{color:#fff}
+
+/* === EVIDENCE TABLE === */
+table{width:100%;border-collapse:collapse;margin:10px 0 20px;font-size:0.82em}
+th{background:#1a1a28;color:#FFD100;text-align:left;padding:10px 12px;font-size:0.75em;text-transform:uppercase;letter-spacing:1px;border-bottom:2px solid #FFD100}
+td{padding:8px 12px;border-bottom:1px solid #1a1a28;vertical-align:top}
+tr:hover{background:rgba(255,209,0,0.03)}
+.pw{color:#00cc66;font-family:'Cascadia Code','Consolas',monospace;font-weight:bold}
+.sev-c{color:#CF142B;font-weight:bold}
+.sev-h{color:#ff8c00;font-weight:bold}
+
+/* === BREACH PIPELINE === */
+.pipeline{display:flex;align-items:center;justify-content:center;gap:0;margin:20px 0;flex-wrap:wrap}
+.pipe-step{background:#1a1a28;border:1px solid #2a2a3a;border-radius:8px;padding:14px 18px;text-align:center;min-width:180px}
+.pipe-step .ps-title{color:#FFD100;font-weight:bold;font-size:0.85em}
+.pipe-step .ps-desc{color:#888;font-size:0.75em;margin-top:4px}
+.pipe-arrow{color:#CF142B;font-size:1.5em;padding:0 8px;font-weight:bold}
+
+/* === EXTORTION MACHINE === */
+.extortion-flow{display:flex;align-items:stretch;gap:0;margin:20px 0;flex-wrap:wrap;justify-content:center}
+.ext-step{background:linear-gradient(135deg,#1a0a0a,#2a1212);border:1px solid #3a1a1a;border-radius:8px;padding:14px 16px;text-align:center;flex:1;min-width:150px;max-width:200px}
+.ext-step .es-num{color:#CF142B;font-size:1.5em;font-weight:900}
+.ext-step .es-title{color:#ff8c00;font-weight:bold;font-size:0.85em;margin:4px 0}
+.ext-step .es-desc{color:#888;font-size:0.72em}
+.ext-arrow{color:#CF142B;font-size:1.5em;display:flex;align-items:center;padding:0 4px}
+
+/* === CARDS === */
+.card{background:linear-gradient(135deg,#12121a,#181825);border:1px solid #2a2a3a;border-left:4px solid #FFD100;border-radius:8px;padding:14px 18px;margin:10px 0}
+.card:hover{border-left-color:#CF142B}
+.card-title{color:#FFD100;font-weight:bold;font-size:0.95em;margin-bottom:6px}
+.card-sub{color:#aaa;font-size:0.82em;line-height:1.6}
+
+/* === FOOTER === */
+.footer{text-align:center;color:#555;margin-top:50px;padding:30px 20px;border-top:4px solid;border-image:linear-gradient(90deg,#FFD100 33%,#003893 33%,#003893 66%,#CF142B 66%) 1;font-size:0.82em}
+.footer .closer{color:#CF142B;font-size:1.3em;font-weight:900;margin-bottom:15px;text-transform:uppercase;letter-spacing:3px}
+
+/* === RESPONSIVE === */
+@media(max-width:900px){.stats{grid-template-columns:repeat(3,1fr)}.profiles{grid-template-columns:1fr}.pipeline,.extortion-flow{flex-direction:column;align-items:center}.pipe-arrow,.ext-arrow{transform:rotate(90deg)}}
+@media print{body{background:#fff;color:#000}.profile{border:1px solid #ccc}h2{color:#003893}.hero{background:#fff}}
+</style>
+</head>
+<body>
+<div class="container">
+
+<!-- ===== HERO ===== -->
+<div class="hero">
+<h1>TeamHDP Exposed</h1>
+<p class="subtitle">The Complete Network Behind Venezuelan Cybercriminal Gerardo Gil Dams</p>
+<p class="byline">OSINT Investigation by Ringmast4r &mdash; February 2026</p>
+<div class="threat-banner">&#9888; ACTIVE THREAT &mdash; Subject is threatening the investigator and their family. FBI, DHS, and local police have been contacted.</div>
+</div>
+
+<!-- ===== STATS ===== -->
+<div class="stats">
+<div class="stat"><div class="n n-red">20+</div><div class="l">Individuals Identified</div></div>
+<div class="stat"><div class="n n-org">7</div><div class="l">Core Members</div></div>
+<div class="stat"><div class="n n-yel">6</div><div class="l">Countries Involved</div></div>
+<div class="stat"><div class="n n-blu">3</div><div class="l">Ransomware Families</div></div>
+<div class="stat"><div class="n n-grn">15+</div><div class="l">Extortion Portals</div></div>
+<div class="stat"><div class="n n-pur">$26M+</div><div class="l">Documented Demands</div></div>
+</div>
+
+<!-- ===== NAV ===== -->
+<div class="nav">
+<a href="#founder">The Founder</a>
+<a href="#core">Core Members</a>
+<a href="#extortion">Extortion Machine</a>
+<a href="#castro">Castro Crime Family</a>
+<a href="#breach">BreachForums Pipeline</a>
+<a href="#network">Network Map</a>
+<a href="#maklad">Maklad / Hezbollah</a>
+<a href="#n33">N33 Adversaries</a>
+<a href="#timeline">Timeline</a>
+<a href="#businesses">Businesses &amp; Fraud</a>
+<a href="#vecert">VECERT Technical</a>
+<a href="#bots">Bot Network</a>
+<a href="#threats">Threats</a>
+<a href="#sources">Sources</a>
+</div>
+
+<!-- ============================================================ -->
+<!-- THE FOUNDER                                                    -->
+<!-- ============================================================ -->
+<h2 id="founder">The Founder <span class="tag b-critical">CRITICAL</span></h2>
+
+<div class="profile critical" style="max-width:100%">
+<div class="p-header">
+<div>
+<div class="p-name">Gerardo Jose Eleazar Gil Dams</div>
+<div class="p-alias">@ThePinguinHDP &bull; Er Pinguino HDP &bull; ggild1983 &bull; VECERT</div>
+</div>
+<span class="p-badge b-critical">CRITICAL &mdash; WANTED</span>
+</div>
+<div class="p-role">Founder &amp; CEO of TeamHDP &bull; Cybercriminal using hacktivism as cover</div>
+<div class="p-details" style="columns:2;gap:30px">
+<strong>DOB:</strong> September 29, 1983<br>
+<strong>Origin:</strong> Estado Falcon, Venezuela<br>
+<strong>Location:</strong> <span class="loc">Doral, FL 33166</span><br>
+<strong>Education:</strong> Universidad Santiago Marino<br>
+<strong>Former Employer:</strong> PDVSA (Marine)<br>
+<strong>Instagram:</strong> @ggild1983 (14.6K), @gerardojg18<br>
+<strong>Twitter/X:</strong> @ThePinguinHDP, @VECERTAmerica, @VECERTRadar<br>
+<strong>LinkedIn:</strong> Gerardo Jose Gil Dams (PDVSA)<br>
+<strong>Chess.com:</strong> gil-dams<br>
+<strong>GETTR:</strong> Gerardo J Gil Dams<br>
+<strong>XSS.is:</strong> Account on Russian cybercrime forum<br><br>
+<strong>Businesses:</strong><br>
+&bull; VECERT Security Labs USA LLC (Suite 2B, Doral) &mdash; FL Doc# L25000472380<br>
+&bull; TurboCredit.us (Suite 2C, Doral) &mdash; credit repair<br>
+&bull; Gil Nursery and Produce Inc &mdash; DISSOLVED 2022<br>
+&bull; PPP Loan: $20,832 for fake construction co<br><br>
+<strong>Addresses:</strong><br>
+&bull; 4711 NW 79th Ave, Suite 2B, Doral, FL 33166<br>
+&bull; 4711 NW 79th Ave, Suite 2C, Doral, FL 33166<br>
+&bull; 7451 Riviera Blvd #209, Miramar, FL 33023<br>
+&bull; 8255 Lake Dr, Las Vistas F302, Doral, FL 33166<br>
+&bull; 1621 Bay Rd #601, Miami Beach, FL 33139<br><br>
+<span class="warn">VENEZUELAN ARREST WARRANT</span> &mdash; July 6, 2021<br>
+Charges: Promotion of hatred, unauthorized access/sabotage of protected systems<br>
+Also investigated for: drug trafficking, extortion, sexual crimes<br>
+<span class="warn">FLED TO UNITED STATES</span> before warrant executed<br><br>
+<strong>Admission via Instagram DM:</strong><br>
+<em>"You got me, Cameron. I'm sorry you support a terrorist regime while living in the United States. Google my name along with the words 'teamhdp' and then you'll cry."</em>
+</div>
+</div>
+
+<div class="card" style="margin-top:15px">
+<div class="card-title">Analyst Assessment</div>
+<div class="card-sub"><strong style="color:#CF142B">Gerardo Gil Dams is a cybercriminal who discovered that anti-Maduro hacktivism is the perfect cover story.</strong> The political operations (airport hack, SEBIN leaks, Hezbollah exposure) are real but serve as a shield &mdash; they generate international press, build legitimacy, and create a "freedom fighter" narrative that deflects from ransomware, extortion, and data sales underneath. When confronted, his instinct was not to deny but to flex &mdash; "Google my name." That's not a political dissident. That's someone who thinks their reputation makes them untouchable.</div>
+</div>
+
+<!-- ============================================================ -->
+<!-- CORE MEMBERS                                                   -->
+<!-- ============================================================ -->
+<h2 id="core">Core Members <span class="tag b-high">7 IDENTIFIED</span></h2>
+
+<div class="profiles">
+
+<div class="profile high">
+<div class="p-header">
+<div>
+<div class="p-name">Miguel Andres Galindo</div>
+<div class="p-alias">El Rey Tukky &bull; El Rey Tuki &bull; "Pinguino anonimo"</div>
+</div>
+<span class="p-badge b-high">HIGH</span>
+</div>
+<div class="p-role">Co-Operator &mdash; Extortion Operations</div>
+<div class="p-details">
+<strong>Nationality:</strong> Venezuelan<br>
+<strong>Social Media:</strong> Facebook, Instagram, YouTube (confirmed "El Rey Tukky")<br>
+<strong>Father:</strong> <span class="warn">Manuel Galindo Ballesteros</span> &mdash; former <strong>Comptroller General of Venezuela (2014-2018)</strong>. Had 13 relatives in his organization (nepotism scandal)<br><br>
+&bull; Assembles hackers to obtain private info on politicians and public figures in Miami for blackmail<br>
+&bull; Coerces hacked individuals into becoming informants &mdash; those who refuse get publicly doxed<br>
+&bull; Labeled "estafador" (scammer) and "sadico" by Venezuelan media<br>
+&bull; Called "supreme fornicator of Petare"<br>
+&bull; Newman Perez got <strong>6 TeamHDP accounts banned</strong><br>
+&bull; Venezuelan media published videos exposing him as "one of the brains" behind TeamHDP
+</div>
+</div>
+
+<div class="profile unknown">
+<div class="p-header">
+<div>
+<div class="p-name">??? UNKNOWN ???</div>
+<div class="p-alias">FailSistem &bull; @Comandpsa</div>
+</div>
+<span class="p-badge b-unknown">UNIDENTIFIED</span>
+</div>
+<div class="p-role">Top Hacker &mdash; Technical Lead for Major Operations</div>
+<div class="p-details">
+<strong>Real Name:</strong> <span class="warn">UNKNOWN &mdash; #1 PRIORITY TARGET TO IDENTIFY</span><br>
+<strong>Nationality:</strong> Venezuelan<br>
+<strong>Twitter:</strong> @Comandpsa<br><br>
+&bull; Most prolific hacker in TeamHDP<br>
+&bull; Led November 2023 PSOE (Spain Socialist Party) breach<br>
+&bull; Accessed email servers, threatened PM Pedro Sanchez<br>
+&bull; Collaborates with <strong>hackers from other countries</strong><br>
+&bull; El Espanol (Spain) published investigation naming FailSistem<br>
+&bull; <strong>International collaboration suggests identity may be traceable through non-Venezuelan channels</strong>
+</div>
+</div>
+
+<div class="profile medium">
+<div class="p-header">
+<div>
+<div class="p-name">Cesar Moya</div>
+<div class="p-alias">@zuricht94</div>
+</div>
+<span class="p-badge b-medium">MEDIUM</span>
+</div>
+<div class="p-role">Propaganda &amp; Bot Network Operator</div>
+<div class="p-details">
+<strong>Nationality:</strong> Venezuelan<br>
+<strong>Twitter/X:</strong> @zuricht94<br><br>
+&bull; Public-facing spokesperson for TeamHDP<br>
+&bull; Publishes group achievements and press releases<br>
+&bull; Anti-Maduro commentary, Venezuela-Colombia border reports<br>
+&bull; Manages coordinated inauthentic behavior via bot network<br>
+&bull; Amplifier accounts: DolarToday (2.9M), HDPY0 (142K), YoSoyJustin (130K)
+</div>
+</div>
+
+<div class="profile high">
+<div class="p-header">
+<div>
+<div class="p-name">Aaron Elias Castro Pulgar</div>
+<div class="p-alias">@soyaaroncastro (unconfirmed)</div>
+</div>
+<span class="p-badge b-high">HIGH &mdash; SPAIN</span>
+</div>
+<div class="p-role">Doxing Campaigns &amp; Extortion Portal Operator</div>
+<div class="p-details">
+<strong>DOB:</strong> ~2001 (24-25 years old)<br>
+<strong>Location:</strong> <span class="loc">SPAIN</span><br>
+<strong>Nationality:</strong> Venezuelan<br><br>
+&bull; Directed <strong>nuevaprensaamerica.com</strong> for TeamHDP doxing campaigns<br>
+&bull; Articles deleted by Laura de Rosa, Galindo, Gil Dams after campaigns<br>
+&bull; Currently runs fraudulent "motivational coaching" as cover<br>
+&bull; Plagiarizes <strong>The Freedom Post</strong> identity from Spain<br>
+&bull; Former students call it "estafa emocional y economica"<br><br>
+<span class="warn">PART OF FAMILY EXTORTION ENTERPRISE</span> &mdash; See Castro Family section below
+</div>
+</div>
+
+<div class="profile medium">
+<div class="p-header">
+<div>
+<div class="p-name">Humberto Felix Avino Salazar</div>
+<div class="p-alias">&mdash;</div>
+</div>
+<span class="p-badge b-medium">MEDIUM</span>
+</div>
+<div class="p-role">Airport Hack Insider</div>
+<div class="p-details">
+<strong>Location:</strong> <span class="loc">Margarita Island, Nueva Esparta, Venezuela</span><br>
+<strong>Employer:</strong> Bolivariana de Puertos (Bolipuertos)<br><br>
+&bull; Provided insider access for July 2021 airport screen hack<br>
+&bull; Detained by SEBIN July 2021 with co-detainees Cesar Boada &amp; Auremys Graterol<br>
+&bull; Court ordered release Dec 2, 2021 &mdash; authorities <strong>re-detained all three at San Antonio Prison for 8+ days</strong><br>
+&bull; Released Dec 11, 2021 under 3.5-year judicial supervision<br>
+&bull; Gil Dams publicly denied connection &mdash; Avino may be a <strong>scapegoat</strong>
+</div>
+</div>
+
+<div class="profile medium">
+<div class="p-header">
+<div>
+<div class="p-name">Laura de Rosa</div>
+<div class="p-alias">&mdash;</div>
+</div>
+<span class="p-badge b-medium">MEDIUM &mdash; NEW</span>
+</div>
+<div class="p-role">Dissemination &amp; Evidence Cleanup</div>
+<div class="p-details">
+<strong>Nationality:</strong> Venezuelan<br><br>
+&bull; Helps disseminate TeamHDP leaks and doxing campaigns<br>
+&bull; Deletes articles from nuevaprensaamerica.com after campaigns conclude<br>
+&bull; Manages information warfare cycle: <strong>publish dox &rarr; extort &rarr; delete evidence</strong><br>
+&bull; Works alongside Miguel Galindo and Gil Dams<br>
+&bull; <span class="warn">NEEDS FULL IDENTIFICATION</span>
+</div>
+</div>
+
+</div>
+
+<!-- ============================================================ -->
+<!-- EXTORTION MACHINE                                              -->
+<!-- ============================================================ -->
+<h2 id="extortion">The Extortion Machine <span class="tag b-critical">$70K+ PER TARGET</span></h2>
+
+<p style="color:#aaa;font-size:0.88em;margin-bottom:15px">TeamHDP operates a systematic extortion pipeline. This isn't random hacking &mdash; it's an organized shakedown operation with specialized roles.</p>
+
+<div class="extortion-flow">
+<div class="ext-step"><div class="es-num">1</div><div class="es-title">HACK</div><div class="es-desc">FailSistem or affiliates breach target's data, emails, photos</div></div>
+<div class="ext-arrow">&rarr;</div>
+<div class="ext-step"><div class="es-num">2</div><div class="es-title">COMPILE</div><div class="es-desc">Galindo assembles compromising info on politicians, public figures</div></div>
+<div class="ext-arrow">&rarr;</div>
+<div class="ext-step"><div class="es-num">3</div><div class="es-title">PUBLISH</div><div class="es-desc">Aaron Castro publishes across 15+ portals (NuevaPrensaAmerica, Noticias Candela)</div></div>
+<div class="ext-arrow">&rarr;</div>
+<div class="ext-step"><div class="es-num">4</div><div class="es-title">DEMAND</div><div class="es-desc">$70,000+ to remove publications. Cooperate or get doxed worse.</div></div>
+<div class="ext-arrow">&rarr;</div>
+<div class="ext-step"><div class="es-num">5</div><div class="es-title">CLEANUP</div><div class="es-desc">Laura de Rosa deletes articles after payment. Evidence destroyed.</div></div>
+</div>
+
+<div class="card">
+<div class="card-title">The Informant Coercion Cycle</div>
+<div class="card-sub">Hacked individuals are given a choice: <strong style="color:#CF142B">become an informant for TeamHDP or get publicly doxed</strong>. Those who cooperate feed the group more intelligence on other targets. Those who refuse have their personal data, communications, and photos published across the portal network. Multiple independent sources (Newman Perez, @estafascrypto, Venezuelan media) have documented this pattern.</div>
+</div>
+
+<!-- ============================================================ -->
+<!-- CASTRO CRIME FAMILY                                            -->
+<!-- ============================================================ -->
+<h2 id="castro">The Castro Crime Family <span class="tag b-critical">INTERPOL RED NOTICE</span></h2>
+
+<p style="color:#aaa;font-size:0.88em;margin-bottom:15px">Aaron Castro Pulgar isn't just a TeamHDP member &mdash; he's part of a <strong style="color:#CF142B">family extortion enterprise</strong> that operates independently and through TeamHDP.</p>
+
+<div class="profiles">
+<div class="profile critical">
+<div class="p-header">
+<div>
+<div class="p-name">Jorge Elias Castro Fernandez</div>
+<div class="p-alias">"Candelario" &mdash; Father of Aaron Castro Pulgar</div>
+</div>
+<span class="p-badge b-critical">CAPTURED</span>
+</div>
+<div class="p-role">Patriarch &mdash; Professional Extortionist &amp; Former Intelligence Agent</div>
+<div class="p-details">
+<strong>Age:</strong> 55 &mdash; Caracas native<br>
+<strong>Former Agency:</strong> <span class="warn">DISIP</span> (Venezuelan intelligence, now dissolved)<br>
+<strong>Criminal Record:</strong> Since 1991 &mdash; firearms, robbery, drug trafficking<br>
+<strong>Operations:</strong> <strong>15+ digital portals</strong> for extortion (primary: "Noticias Candela")<br><br>
+<span class="warn">SENTENCED TO 40 MONTHS IN PRISON IN PANAMA</span><br>
+Crime: Extorting the son-in-law of Panamanian President Laurentino Cortizo<br><br>
+<span class="warn">INTERPOL RED NOTICE REQUESTED</span><br>
+<span class="warn">CAPTURED IN SPAIN</span><br><br>
+Called "the biggest extortionist in Venezuela and Panama" by Notitarde. Described as "professional in defamation and extortion" who pivoted from street crime to digital blackmail.
+</div>
+</div>
+
+<div class="profile medium">
+<div class="p-header">
+<div>
+<div class="p-name">Yenny Coromoto Pulgar Leon</div>
+<div class="p-alias">Mother of Aaron Castro Pulgar</div>
+</div>
+<span class="p-badge b-medium">MEDIUM</span>
+</div>
+<div class="p-role">Co-Conspirator in Family Extortion Operations</div>
+<div class="p-details">
+<strong>Role:</strong> Co-conspirator in all family extortion operations<br>
+<strong>Location:</strong> Unknown<br>
+&bull; Active participant in the Noticias Candela network
+</div>
+</div>
+</div>
+
+<div class="card">
+<div class="card-title">Family MO: The $70,000 Shakedown</div>
+<div class="card-sub">
+1. Obtain compromising or personal information about target (via hacking, HUMINT, or purchase from TeamHDP)<br>
+2. Publish defamatory content across <strong>15+ digital portals</strong> simultaneously<br>
+3. Demand <strong>$70,000+</strong> to remove all publications<br>
+4. If target pays, articles are deleted by Laura de Rosa<br>
+5. If target refuses, escalate with more publications and doxing<br><br>
+<strong>Sources:</strong> elfarodelmorro.net, albertonews.com, globovision.com, notitarde.com.ve
+</div>
+</div>
+
+<!-- ============================================================ -->
+<!-- BREACHFORUMS PIPELINE                                          -->
+<!-- ============================================================ -->
+<h2 id="breach">The BreachForums Pipeline <span class="tag b-unknown">VECERT = THE BREACH?</span></h2>
+
+<p style="color:#aaa;font-size:0.88em;margin-bottom:15px">Gil Dams operates VECERT as a "threat intelligence" company via @VECERTRadar on Twitter. But VECERTRadar has published breach details <strong style="color:#CF142B">BEFORE they appeared on criminal forums</strong> &mdash; proving Gil Dams either IS the breach actor or has direct advance access.</p>
+
+<div class="pipeline">
+<div class="pipe-step"><div class="ps-title">&#128374; HACK</div><div class="ps-desc">malconguerra2 / Gordon Freeman / HvckMvSoneria33 breach LATAM targets</div></div>
+<div class="pipe-arrow">&rarr;</div>
+<div class="pipe-step"><div class="ps-title">&#128240; PUBLISH</div><div class="ps-desc">VECERTRadar tweets breach alert BEFORE it appears on BreachForums</div></div>
+<div class="pipe-arrow">&rarr;</div>
+<div class="pipe-step"><div class="ps-title">&#128176; PROFIT</div><div class="ps-desc">VECERT looks like threat intel. Gil Dams sells API access. Data sold separately.</div></div>
+<div class="pipe-arrow">&rarr;</div>
+<div class="pipe-step"><div class="ps-title">&#127917; REPEAT</div><div class="ps-desc">Same pattern across Cashea, Bancrecer, Peru courts, UNMSM, Spain ministry</div></div>
+</div>
+
+<div class="profiles">
+<div class="profile unknown">
+<div class="p-header">
+<div>
+<div class="p-name">malconguerra2</div>
+<div class="p-alias">Possibly Gil Dams Himself</div>
+</div>
+<span class="p-badge b-unknown">UNIDENTIFIED</span>
+</div>
+<div class="p-role">BreachForums Actor &mdash; LATAM Focus</div>
+<div class="p-details">
+<strong>Platform:</strong> BreachForums<br>
+<strong>Known Breaches:</strong><br>
+&bull; Cashea (Venezuelan fintech) &mdash; <span class="sev-c">79,006,942 records</span> (46.5 GB)<br>
+&bull; Peru courts (Corte Superior de Lima Norte) &mdash; 1.9 GB confidential PDFs<br>
+&bull; UNMSM Peru &mdash; 290,000 academic records<br><br>
+<span class="warn">KEY EVIDENCE:</span> VECERTRadar published Cashea breach on Feb 21, 2026 BEFORE it appeared on forums<br>
+"mal con guerra" = "bad at war" in Venezuelan Spanish slang
+</div>
+</div>
+
+<div class="profile unknown">
+<div class="p-header">
+<div>
+<div class="p-name">HvckMvSoneria33</div>
+<div class="p-alias">BlackHex Brotherhood</div>
+</div>
+<span class="p-badge b-unknown">UNIDENTIFIED</span>
+</div>
+<div class="p-role">BreachForums + Telegram &mdash; LATAM Government Docs</div>
+<div class="p-details">
+<strong>Platforms:</strong> Telegram, BreachForums<br>
+<strong>Known Breaches:</strong><br>
+&bull; Dec 5, 2025: <strong>250,000 Colombian passport records</strong><br>
+&bull; Dec 25, 2025: First Cashea disclosure (30K+ records, payment data)<br><br>
+LATAM-focused group targeting government identity documents + financial sector data
+</div>
+</div>
+
+<div class="profile unknown">
+<div class="p-header">
+<div>
+<div class="p-name">Gordon Freeman</div>
+<div class="p-alias">&mdash;</div>
+</div>
+<span class="p-badge b-unknown">UNIDENTIFIED</span>
+</div>
+<div class="p-role">BreachForums + Telegram &mdash; Venezuela + SPAIN</div>
+<div class="p-details">
+<strong>Platforms:</strong> BreachForums, Telegram<br>
+<strong>Known Breaches:</strong><br>
+&bull; Jan 30, 2026: Cashea &mdash; 30K+ records (referenced HvckMvSoneria33)<br>
+&bull; Feb 11, 2026: Bancrecer Venezuela &mdash; <span class="sev-c">65,000 banking records</span><br>
+&bull; ~Feb 2026: <span class="sev-c">Spain's Ministerio de Ciencia e Innovacion</span> &mdash; IDOR + leaked creds &rarr; full admin access<br><br>
+<span class="warn">CRITICAL:</span> Spain ministry hack mirrors TeamHDP's PSOE breach. Same country, same MO. Strong indicator of coordination.
+</div>
+</div>
+
+<div class="profile high">
+<div class="p-header">
+<div>
+<div class="p-name">Hector (Last Name Unknown)</div>
+<div class="p-alias">&mdash;</div>
+</div>
+<span class="p-badge b-high">HIGH &mdash; MEXICO</span>
+</div>
+<div class="p-role">Mexican Connection &mdash; White Hat / Black Hat</div>
+<div class="p-details">
+<strong>Nationality:</strong> Mexican<br>
+<strong>Location:</strong> Mexico (city unknown)<br><br>
+&bull; Plays both sides depending on business<br>
+&bull; Connected to Gil Dams / VECERT<br>
+&bull; Gil published a Mexican government attack <strong>BEFORE it hit any forum</strong> &mdash; proves direct communication<br>
+&bull; Crew involved in carding and selling dumps<br>
+&bull; MX OSINT community suspects him behind recent government attack<br>
+&bull; Connected to an unidentified Venezuelan hacker<br><br>
+<span class="warn">STILL NEEDED:</span> Last name, aliases, handles, city, which specific gov attack<br>
+<strong>Source:</strong> Eme Dv (@dagga.boy on Instagram)
+</div>
+</div>
+</div>
+
+<!-- ============================================================ -->
+<!-- NETWORK MAP                                                    -->
+<!-- ============================================================ -->
+<h2 id="network">Network Map</h2>
+
+<div class="network-map">
+<div class="net-row">
+<span class="net-label">Founder</span>
+<span class="node node-boss">GERARDO GIL DAMS<br><small>@ThePinguinHDP &bull; Doral, FL &bull; WANTED</small></span>
+</div>
+<div class="connector">&#9474;<br>&#9500;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9532;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9532;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9532;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9508;</div>
+
+<div class="net-row">
+<span class="net-label">TeamHDP Core</span>
+<span class="node node-core">FailSistem ???<br><small>@Comandpsa</small></span>
+<span class="node node-core">Laura de Rosa<br><small>Dissemination</small></span>
+<span class="node node-core">Avino Salazar<br><small>Airport insider</small></span>
+</div>
+
+<div class="net-row">
+<span class="net-label">Extortion Wing</span>
+<span class="node node-extort">Miguel Galindo<br><small>El Rey Tukky</small></span>
+<span class="node node-extort">Aaron Castro<br><small>SPAIN &bull; 15+ portals</small></span>
+<span class="node node-extort">Jorge Castro<br><small>CAPTURED &bull; INTERPOL</small></span>
+<span class="node node-extort">Yenny Pulgar<br><small>Mother / co-conspirator</small></span>
+</div>
+
+<div class="net-row">
+<span class="net-label">Propaganda</span>
+<span class="node node-prop">Cesar Moya<br><small>@zuricht94</small></span>
+<span class="node node-prop">DolarToday<br><small>2.9M followers</small></span>
+<span class="node node-prop">HDPY0<br><small>142K followers</small></span>
+<span class="node node-prop">YoSoyJustin<br><small>130K followers</small></span>
+<span class="node node-prop">+ BOT ARMY<br><small>Automated accounts</small></span>
+</div>
+
+<div class="net-row">
+<span class="net-label">BreachForums Actors</span>
+<span class="node node-breach">malconguerra2<br><small>Cashea 79M &bull; Peru</small></span>
+<span class="node node-breach">HvckMvSoneria33<br><small>BlackHex Brotherhood</small></span>
+<span class="node node-breach">Gordon Freeman<br><small>Spain + VZ banks</small></span>
+<span class="node node-breach">Hector<br><small>Mexico &bull; carding</small></span>
+</div>
+
+<div class="net-row">
+<span class="net-label">Exposed by TeamHDP Leak</span>
+<span class="node node-maklad">Jalal Maklad<br><small>Terror financing</small></span>
+<span class="node node-maklad">Rabi Maklad<br><small>Human trafficking</small></span>
+<span class="node node-maklad">Majdi Maklad<br><small>Arms trafficking</small></span>
+<span class="node node-maklad">al-Matthani<br><small>Caribbean arms</small></span>
+<span class="node node-maklad" style="min-width:180px">HEZBOLLAH<br><small>Margarita Island base</small></span>
+</div>
+
+<div class="net-row">
+<span class="net-label">Adversaries (Opposite Side)</span>
+<span class="node node-dead">N33 / Almeida<br><small>DEAD &bull; May 2023</small></span>
+<span class="node node-dead">Carlos Almeida<br><small>@ChuchoAlmeida</small></span>
+<span class="node node-dead">Jorge Almeida<br><small>@Numbmax</small></span>
+</div>
+</div>
+
+<!-- ============================================================ -->
+<!-- MAKLAD / HEZBOLLAH                                             -->
+<!-- ============================================================ -->
+<h2 id="maklad">Maklad Crime Family &amp; Hezbollah Connection <span class="tag b-critical">TERROR FINANCING</span></h2>
+
+<div class="card" style="border-left-color:#CF142B">
+<div class="card-title" style="color:#CF142B">&#9888; Margarita Island = "Hezbollah's Most Important Base of Operations in the Western Hemisphere"</div>
+<div class="card-sub">&mdash; Marshall Billingslea, former US Treasury Asst Secretary for Terrorist Financing, Senate testimony (October 2025)<br><br>
+The Maklad family was exposed by TeamHDP's DGCIM/SEBIN breach in October 2021. First published by <strong>Israel Hayom</strong>. Druze-origin clan from As-Suwayda, Syria &mdash; operating on Margarita Island for <strong>four generations</strong>. Described as "sole owners" of Santiago Marino airport. Direct ties to <strong>Tareck El Aissami</strong> (OFAC-designated narcotics kingpin, arrested April 2024, accused of embezzling $21 BILLION from PDVSA). ~400 Hezbollah commanders reportedly relocated to South America after Israeli strikes (2025).</div>
+</div>
+
+<div class="profiles">
+<div class="profile critical">
+<div class="p-header"><div><div class="p-name">Jalal Maklad</div></div><span class="p-badge b-critical">CRITICAL</span></div>
+<div class="p-role">Primary Financial Operator &mdash; Hezbollah Pipeline</div>
+<div class="p-details"><strong>Origin:</strong> As-Suwayda, Syria (Druze)<br><strong>Location:</strong> <span class="loc">Margarita Island, Venezuela</span><br><strong>Operations:</strong> Cocaine trafficking, strategic mineral smuggling (coltan/gold), <span class="warn">international terror financing</span></div>
+</div>
+
+<div class="profile critical">
+<div class="p-header"><div><div class="p-name">Rabi Maklad</div></div><span class="p-badge b-critical">CRITICAL</span></div>
+<div class="p-role">Most Operationally Connected &mdash; Colombian Ties</div>
+<div class="p-details"><strong>Origin:</strong> As-Suwayda, Syria (Druze)<br><strong>Location:</strong> <span class="loc">Margarita Island, Venezuela</span><br><strong>Operations:</strong> Cocaine, <span class="warn">trafficking of women and minors</span>, money laundering, terror financing<br>"One of the organized crime heads with trade ties in Colombia" &mdash; Margarita-Maicao laundering route</div>
+</div>
+
+<div class="profile critical">
+<div class="p-header"><div><div class="p-name">Majdi Maklad</div></div><span class="p-badge b-critical">CRITICAL</span></div>
+<div class="p-role">Arms &amp; Cocaine Trafficking</div>
+<div class="p-details"><strong>Origin:</strong> As-Suwayda, Syria (Druze)<br><strong>Location:</strong> <span class="loc">Margarita Island, Venezuela</span><br><strong>Operations:</strong> Cocaine trade, <span class="warn">weapons and ammunition trafficking</span><br>Connects to broader Caribbean weapons pipeline</div>
+</div>
+
+<div class="profile critical">
+<div class="p-header"><div><div class="p-name">Hayyan al-Matthani</div></div><span class="p-badge b-critical">CRITICAL</span></div>
+<div class="p-role">Caribbean Arms Trafficking Routes</div>
+<div class="p-details"><strong>Origin:</strong> Syrian (Druze community)<br><strong>Location:</strong> <span class="loc">Caribbean / Margarita Island</span><br><strong>Operations:</strong> Arms trade with <span class="warn">British Virgin Islands</span> and <span class="warn">Dutch Caribbean</span> (Curacao, Aruba, Bonaire, Sint Maarten)<br>Not Maklad by blood but operates within their network</div>
+</div>
+</div>
+
+<!-- ============================================================ -->
+<!-- N33 ADVERSARIES                                                -->
+<!-- ============================================================ -->
+<h2 id="n33">N33 Group &mdash; Adversaries <span class="tag b-dead">PRO-GOVERNMENT</span></h2>
+
+<p style="color:#aaa;font-size:0.88em;margin-bottom:15px">N33 was TeamHDP's <strong>enemy</strong>, not ally. Pro-Chavismo government hackers who attacked opposition. TeamHDP's SEBIN/DGCIM leaks exposed the intelligence apparatus N33 worked within.</p>
+
+<div class="profiles">
+<div class="profile dead">
+<div class="p-header"><div><div class="p-name">Juan Manuel Almeida Morgado</div><div class="p-alias">N33 &bull; Hacker N33</div></div><span class="p-badge b-dead">DECEASED</span></div>
+<div class="p-role">Government Hacker &mdash; SEBIN Operative</div>
+<div class="p-details"><strong>DOB:</strong> January 25, 1980 &bull; <strong>Cedula:</strong> C.I. 14.060.444<br><strong>Died:</strong> May 15, 2023 under house arrest (officially "cirrhosis" &mdash; suspicious)<br><strong>Close to:</strong> Tareck El Aissami since 2012<br><strong>Arrested:</strong> April 5, 2023 &mdash; PDVSA-Crypto scandal<br><strong>Found with:</strong> grenades, assault rifle, official government credentials</div>
+</div>
+
+<div class="profile dead">
+<div class="p-header"><div><div class="p-name">Carlos Jesus Almeida Morgado</div><div class="p-alias">@ChuchoAlmeida &bull; C.I. 11.979.648</div></div><span class="p-badge b-low">ACTIVE</span></div>
+<div class="p-role">N33 Group &mdash; Brother</div>
+<div class="p-details">Part of Almeida brothers pro-government hacker crew</div>
+</div>
+
+<div class="profile dead">
+<div class="p-header"><div><div class="p-name">Jorge Luis Almeida Morgado</div><div class="p-alias">@Numbmax &bull; C.I. 16.436.259</div></div><span class="p-badge b-low">ACTIVE</span></div>
+<div class="p-role">N33 Group &mdash; Brother</div>
+<div class="p-details">Twitter: @Numbmax. Part of Almeida brothers crew</div>
+</div>
+</div>
+
+<!-- ============================================================ -->
+<!-- TIMELINE                                                       -->
+<!-- ============================================================ -->
+<h2 id="timeline">Operations Timeline</h2>
+
+<div class="timeline">
+<div class="t-item"><div class="t-date">~2014</div><div class="t-text">TeamHDP informally organized during Venezuelan protests</div></div>
+<div class="t-item"><div class="t-date">2016</div><div class="t-text">Operating as <strong>#TeamVene10</strong></div></div>
+<div class="t-item"><div class="t-date">2017</div><div class="t-text">Rebranded to <strong>#TeamHDP</strong></div></div>
+<div class="t-item"><div class="t-date">February 2019</div><div class="t-text">Gil Nursery and Produce Inc filed in Florida (dissolved Sept 2022)</div></div>
+<div class="t-item t-critical"><div class="t-date">July 6, 2021</div><div class="t-text"><strong>Airport Screen Hack</strong> &mdash; "Maduro Dictador" on screens at Porlamar + Maiquetia. Avino Salazar detained. Arrest warrant issued for Gil Dams.</div></div>
+<div class="t-item"><div class="t-date">August 16, 2021</div><div class="t-text"><strong>Supreme Court (TSJ) Hack</strong> &mdash; Mass messages to ALL judges. Downloaded personnel data.</div></div>
+<div class="t-item t-critical"><div class="t-date">Sept-Oct 2021</div><div class="t-text"><strong>DGCIM/SEBIN Breach</strong> &mdash; 600+ intel IDs leaked. 200 counterintel officers in Colombia exposed. <strong>Hezbollah operatives and Maklad crime family exposed.</strong> Published by Israel Hayom.</div></div>
+<div class="t-item"><div class="t-date">December 2021</div><div class="t-text">Avino, Boada, Graterol released after 5+ months detention. Gil Dams flees to Florida.</div></div>
+<div class="t-item"><div class="t-date">April 2021</div><div class="t-text"><strong>PPP Loan Fraud</strong> &mdash; $20,832 for fake "New Housing For-Sale Builders" business. Fully forgiven.</div></div>
+<div class="t-item t-critical"><div class="t-date">June 2022</div><div class="t-text"><strong>Ministry of Defense Breach</strong> &mdash; 5,000+ classified files from Bolivarian Navy.</div></div>
+<div class="t-item"><div class="t-date">April 2023</div><div class="t-text">N33 arrested in PDVSA-Crypto scandal. Found with grenades, assault rifle.</div></div>
+<div class="t-item"><div class="t-date">May 2023</div><div class="t-text">N33 dies under house arrest. Officially "cirrhosis." Suspicious.</div></div>
+<div class="t-item t-critical"><div class="t-date">November 2023</div><div class="t-text"><strong>PSOE (Spain) Hack</strong> &mdash; FailSistem breaches Spanish Socialist Party email servers. PM Sanchez targeted.</div></div>
+<div class="t-item t-critical"><div class="t-date">February 2024</div><div class="t-text"><strong>Digitel Ransomware</strong> &mdash; Medusa deployed on Venezuelan telecom. <strong>$5 MILLION Bitcoin demand.</strong> Millions of user records leaked.</div></div>
+<div class="t-item"><div class="t-date">April 2024</div><div class="t-text">Tareck El Aissami arrested in Venezuela. Accused of $21B PDVSA embezzlement.</div></div>
+<div class="t-item"><div class="t-date">June 2024</div><div class="t-text">Farmatodo threat: "Is everything okay?" Same ransomware pattern.</div></div>
+<div class="t-item"><div class="t-date">October 2025</div><div class="t-text">VECERT Security Labs USA LLC filed in Florida. Doc# L25000472380.</div></div>
+<div class="t-item"><div class="t-date">December 2025</div><div class="t-text">HvckMvSoneria33 posts 250K Colombian passports and first Cashea disclosure.</div></div>
+<div class="t-item"><div class="t-date">January 2026</div><div class="t-text">Gordon Freeman posts massive Cashea leak + Bancrecer Venezuela 65K records.</div></div>
+<div class="t-item t-critical"><div class="t-date">February 22, 2026</div><div class="t-text"><strong>Part 1 Published:</strong> "VECERT Exposed" &mdash; Ringmast4r Substack. Gil Dams responds: "You got me, Cameron."</div></div>
+<div class="t-item t-critical"><div class="t-date">February 23, 2026</div><div class="t-text"><span class="warn">GIL DAMS THREATENS INVESTIGATOR AND FAMILY.</span> Police, FBI, DHS contacted.</div></div>
+</div>
+
+<!-- ============================================================ -->
+<!-- BUSINESSES & FRAUD                                             -->
+<!-- ============================================================ -->
+<h2 id="businesses">Businesses &amp; Financial Fraud</h2>
+
+<table>
+<tr><th>Business</th><th>Address</th><th>FL Doc#</th><th>Status</th><th>Reality</th></tr>
+<tr><td><strong>VECERT Security Labs USA LLC</strong></td><td>4711 NW 79th Ave, Suite 2B, Doral, FL</td><td>L25000472380</td><td>Active (filed Oct 2025)</td><td class="sev-c">One-man op scraping criminal forums. 583K+ records on GitHub. Hardcoded stolen credentials. No EIN.</td></tr>
+<tr><td><strong>TurboCredit.us</strong></td><td>4711 NW 79th Ave, Suite 2C, Doral, FL</td><td>&mdash;</td><td>Active</td><td>Credit repair. 2 Trustpilot reviews (both 5-star, both Spanish). Claims 1,000+ clients.</td></tr>
+<tr><td><strong>Gil Nursery and Produce Inc</strong></td><td>8255 Lake Dr, Las Vistas F302, Doral, FL</td><td>P19000013514</td><td class="sev-c">DISSOLVED (Sept 2022)</td><td>No evidence of nursery/produce operations. Agent at 7451 Riviera Blvd #209, Miramar.</td></tr>
+<tr><td><strong>PPP Loan</strong></td><td>&mdash;</td><td>&mdash;</td><td class="sev-c">Fully Forgiven</td><td>$20,832 for "New Housing For-Sale Builders." No construction business exists. Probable fraud.</td></tr>
+</table>
+
+<!-- ============================================================ -->
+<!-- VECERT TECHNICAL                                               -->
+<!-- ============================================================ -->
+<h2 id="vecert">VECERT Technical Evidence <span class="tag" style="background:#00cc66;color:#000">633K+ RECORDS</span></h2>
+
+<table>
+<tr><th>Repository</th><th>Records</th><th>Content</th></tr>
+<tr><td>DarkForumCTI</td><td>~44,448</td><td>Dark forum users, breach listings, exploit sales, combolists</td></tr>
+<tr><td>LeakBaseCTI</td><td>~134,652</td><td>125K user profiles, breach catalogs, stealer logs</td></tr>
+<tr><td>XSS.isCTI</td><td>~50,374</td><td>19 years of Russian hacking forum posts</td></tr>
+<tr><td>Analyzer API</td><td>403,927+</td><td>BreachForums, XSS, Cracked, XForums aggregated</td></tr>
+<tr style="background:#1a1a28"><td><strong>TOTAL</strong></td><td><strong>633,401+</strong></td><td><strong>Criminal forum data on public GitHub</strong></td></tr>
+</table>
+
+<h3>Hardcoded Stolen Credentials in GitHub Code</h3>
+<table>
+<tr><th>Repo</th><th>Secret Type</th><th>Value</th></tr>
+<tr><td>DarkForumCTI</td><td>ProtonMail UID</td><td class="pw">upyulffn33faq6mnwkuzz7q2qjqekalz</td></tr>
+<tr><td>DarkForumCTI</td><td>ProtonMail Cookie</td><td class="pw">y6iuhnkaogtvhzjrfa4jf7xo2mykln6e</td></tr>
+<tr><td>DarkForumCTI</td><td>ProtonMail Session</td><td class="pw">aIYuoSom-KqULYafC086vAAAAQ8</td></tr>
+<tr><td>DarkEye</td><td>DarkEye Session</td><td class="pw">b1ab69c55f648ec8067416c032051898</td></tr>
+<tr><td>DarkEye</td><td>Pickle ASSETS</td><td>Contains <span class="sev-c">cne.gob.ve</span> (Venezuela elections)</td></tr>
+</table>
+
+<div class="card">
+<div class="card-title">Unauthenticated API</div>
+<div class="card-sub"><code style="color:#CF142B">https://vecertapi.com/api_analyzer</code> &mdash; NO authentication, NO rate limiting. Anyone could dump 403K+ criminal forum posts. Now returning 404 (taken down after our investigation).<br><br>Gil Dams also has an account on <strong style="color:#CF142B">XSS.is</strong> &mdash; the same Russian cybercrime forum his tools scrape.</div>
+</div>
+
+<!-- ============================================================ -->
+<!-- BOT NETWORK                                                    -->
+<!-- ============================================================ -->
+<h2 id="bots">Bot Network &amp; Coordinated Inauthentic Behavior</h2>
+
+<p style="color:#aaa;font-size:0.88em;margin-bottom:15px">Researcher <strong>Erin Gallagher</strong> documented that #TeamHDP had "tremendous reach" on Twitter through coordinated inauthentic behavior using automation and bot accounts.</p>
+
+<table>
+<tr><th>Account</th><th>Followers</th><th>Role</th><th>Status</th></tr>
+<tr><td><strong>DolarToday</strong></td><td class="sev-h">2,900,000 (verified)</td><td>Primary amplifier for TeamHDP content</td><td>Active</td></tr>
+<tr><td><strong>HDPY0</strong></td><td>142,000</td><td>Amplifier</td><td>Active</td></tr>
+<tr><td><strong>YoSoyJustin</strong></td><td>130,000</td><td>Amplifier</td><td>Active</td></tr>
+<tr><td>+ automated bots</td><td>&mdash;</td><td>Coordinated inauthentic behavior</td><td>Active</td></tr>
+</table>
+
+<div class="card">
+<div class="card-title">Newman Perez Takedown</div>
+<div class="card-sub">Venezuelan entrepreneur Newman Perez succeeded in getting <strong>6 main TeamHDP social media accounts blocked</strong> after they spread false claims about donations for sick child Jacknelly Rangel Briceno. Perez publicly unmasked ThePinguinHDP and documented the extortion tactics.</div>
+</div>
+
+<!-- ============================================================ -->
+<!-- THREATS                                                        -->
+<!-- ============================================================ -->
+<h2 id="threats" style="color:#CF142B">&#9888; Active Threats Against Investigator <span class="tag b-critical">ONGOING</span></h2>
+
+<div class="card" style="border-left-color:#CF142B;background:linear-gradient(135deg,#1a0808,#200a0a)">
+<div class="card-title" style="color:#CF142B">February 23, 2026 &mdash; Threats Against Victim AND Family</div>
+<div class="card-sub">
+After publication of Part 1 ("VECERT Exposed"), Gil Dams / TeamHDP began <strong style="color:#CF142B">threatening the investigator (Cameron / Ringmast4r) and their family</strong>. Subject is attempting to identify and dox the investigator.<br><br>
+
+<strong>Prior Admission (Instagram DM from @ggild1983):</strong><br>
+<em>"You got me, Cameron. I'm sorry you support a terrorist regime while living in the United States. Google my name along with the words 'teamhdp' and then you'll cry."</em><br><br>
+
+<strong>Pattern:</strong> This is consistent with TeamHDP's documented MO &mdash; hack/obtain personal info &rarr; publish on portal network &rarr; demand payment &rarr; escalate if target does not comply.<br><br>
+
+<strong>Agencies Contacted:</strong> Local Police, FBI, DHS<br>
+<strong>FBI Miami Field Office:</strong> (305) 944-9101<br>
+<strong>DHS Tip Line:</strong> 1-866-347-2423
+</div>
+</div>
+
+<!-- ============================================================ -->
+<!-- RANSOMWARE                                                     -->
+<!-- ============================================================ -->
+<h2>Ransomware Portfolio</h2>
+
+<table>
+<tr><th>Family</th><th>Known Deployment</th><th>Demand</th><th>Status</th></tr>
+<tr><td class="sev-c">Medusa</td><td>Digitel Venezuela (Feb 2024)</td><td>$5,000,000 BTC</td><td>Data leaked after non-payment</td></tr>
+<tr><td class="sev-c">Blackmatter</td><td>Attributed by multiple sources</td><td>Unknown</td><td>Attributed</td></tr>
+<tr><td class="sev-c">LockBit 2.0</td><td>Attributed; LockBit separately claimed Fed breach (Jun 2024)</td><td>Unknown</td><td>Possible connection</td></tr>
+</table>
+
+<!-- ============================================================ -->
+<!-- SOURCES                                                        -->
+<!-- ============================================================ -->
+<h2 id="sources">Sources &amp; Evidence</h2>
+
+<h3>Venezuelan Legal / Arrest Warrant</h3>
+<div class="p-details">
+&bull; RedRadioVE &mdash; Arrest warrant for Gil Dams<br>
+&bull; Noticias24 Carabobo &mdash; Arrest order<br>
+&bull; Globovision &mdash; Public Ministry prosecution request<br>
+&bull; Cronica.uno &mdash; Three Margarita Island detainees released
+</div>
+
+<h3>TeamHDP Operations</h3>
+<div class="p-details">
+&bull; CyberShafarat &mdash; DGCIM/SEBIN exposure analysis<br>
+&bull; Israel Hayom (Oct 26, 2021) &mdash; "Hezbollah operatives given refuge in Venezuela"<br>
+&bull; Infobae &mdash; 5,000+ classified Maduro regime files<br>
+&bull; El Espanol (Nov 2023) &mdash; TeamHDP / El Pinguino PSOE hack<br>
+&bull; LaPatilla &mdash; PSOE information theft<br>
+&bull; ABCNoticias &mdash; TSJ database hack<br>
+&bull; Grey Dynamics &mdash; Maduro's corrupt practices and leaks
+</div>
+
+<h3>Counter-Narrative / Exposés</h3>
+<div class="p-details">
+&bull; @estafascrypto (Hive Blog) &mdash; TeamHDP international impact / accusations<br>
+&bull; Venezuela Digital Hoy &mdash; ThePinguinHDP unmasked by Newman Perez<br>
+&bull; Venezuela Hoy en Dia &mdash; Miguel Galindo / El Rey Tukky scandal video<br>
+&bull; Venezuela Digital Hoy &mdash; Rey Tukky / El Pinguino / Galindo same person<br>
+&bull; Notiarepa &mdash; TeamHDP scammers wanted<br>
+&bull; Erin Gallagher (Medium) &mdash; Automation in Venezuelan Twitter networks
+</div>
+
+<h3>Castro Family Criminal Enterprise</h3>
+<div class="p-details">
+&bull; El Faro del Morro &mdash; Aaron Castro Pulgar exposé<br>
+&bull; Notitele.online &mdash; Victims of Aaron's fraudulent courses<br>
+&bull; AlbertoNews &mdash; Jorge Castro 40-month Panama sentence<br>
+&bull; AlbertoNews &mdash; Interpol Red Notice for Jorge Castro<br>
+&bull; Globovision &mdash; Jorge Castro captured in Spain<br>
+&bull; Notitarde &mdash; Jorge Castro extortion profile
+</div>
+
+<h3>Maklad / Hezbollah / El Aissami</h3>
+<div class="p-details">
+&bull; Israel Hayom (Oct 26, 2021) &mdash; Hezbollah in Venezuela<br>
+&bull; JNS &mdash; Hezbollah operatives sheltered in Venezuela<br>
+&bull; IFMAT &mdash; Iranian proxy Hezbollah trafficking rings<br>
+&bull; i-AML &mdash; "The Hezbollah Incubator"<br>
+&bull; US Treasury &mdash; El Aissami Kingpin Designation (Feb 2017)<br>
+&bull; DOJ SDNY &mdash; El Aissami charges<br>
+&bull; Hudson Institute / Senate Drug Caucus &mdash; Billingslea testimony<br>
+&bull; Fox News (Dec 2025) &mdash; 400 Hezbollah commanders relocating<br>
+&bull; RAND Corporation &mdash; Hezbollah's Networks in Latin America<br>
+&bull; Atlantic Council &mdash; Maduro-Hezbollah Nexus
+</div>
+
+<h3>N33 / Almeida</h3>
+<div class="p-details">
+&bull; Infobae &mdash; The hacker who ended up dead<br>
+&bull; Efecto Cocuyo &mdash; Who was N33<br>
+&bull; RunRun.es &mdash; Juan Manuel Almeida profile
+</div>
+
+<h3>Financial / Business Records</h3>
+<div class="p-details">
+&bull; ProPublica &mdash; PPP loan data ($20,832)<br>
+&bull; FederalPay &mdash; PPP loan details<br>
+&bull; Florida Sunbiz &mdash; VECERT (L25000472380), Gil Nursery (P19000013514)<br>
+&bull; TurboCredit.us &mdash; Company website<br>
+&bull; Trustpilot &mdash; TurboCredit reviews
+</div>
+
+<h3>BreachForums Activity</h3>
+<div class="p-details">
+&bull; BeInCrypto &mdash; Cashea breach (79M records)<br>
+&bull; Punto de Corte &mdash; Cashea exposure report<br>
+&bull; VECERTRadar on X &mdash; Breach alerts (timing evidence)<br>
+&bull; Hackmanac on X &mdash; Spain Ministry / Gordon Freeman
+</div>
+
+<h3>Own Investigation</h3>
+<div class="p-details">
+&bull; Part 1: "VECERT Exposed: A One-Man Miami LLC Scraping Cybercrime Forums and Calling It Intelligence" &mdash; Ringmast4r Substack<br>
+&bull; Part 2: "The Penguin Unmasked: Inside TeamHDP" &mdash; Ringmast4r Substack<br>
+&bull; Local investigation files and cloned GitHub repositories
+</div>
+
+<!-- ===== FOOTER ===== -->
+<div class="footer">
+<div class="closer">I rolled one of you already. I'm coming for the rest of you now.</div>
+<p>Investigation conducted entirely using open source intelligence (OSINT) methods. All data from publicly accessible sources including Florida state records, Venezuelan court records as reported by media, public GitHub repositories, social media profiles, published news articles, and US government sanctions databases. No systems were accessed without authorization.</p>
+<p style="margin-top:15px"><strong>TeamHDP Network Exposed &mdash; Ringmast4r Investigation Suite</strong><br>
+Last Updated: February 23, 2026 &bull; 20+ individuals &bull; 6 countries &bull; 3 ransomware families &bull; $26M+ in documented demands</p>
+</div>
+
+</div>
+</body>
+</html>
